@@ -368,7 +368,7 @@ public class MatroskaExtractor implements Extractor {
   @Nullable private Track currentTrack;
 
   // The current AdditionMapping element, or null.
-  private AdditionMapping currentAdditionMapping;
+  private BlockAdditionMapping currentBlockAdditionMapping;
 
   // Whether a seek map has been sent to the output.
   private boolean sentSeekMap;
@@ -668,8 +668,8 @@ public class MatroskaExtractor implements Extractor {
         currentTrack.hasColorInfo = true;
         break;
       case ID_BLOCK_ADDITION_MAPPING:
-        currentAdditionMapping = new AdditionMapping();
-        Log.i("yusesope","ID_BLOCK_ADDITIONAL_MAPPING is open");
+        // Block Addition Mapping was opened
+        currentBlockAdditionMapping = new BlockAdditionMapping();
         break;
       default:
         break;
@@ -749,11 +749,11 @@ public class MatroskaExtractor implements Extractor {
         }
         break;
       case ID_BLOCK_ADDITION_MAPPING:
-        if (currentTrack.listAdditionMapping == null){
-          currentTrack.listAdditionMapping = new ArrayList<>();
+        if (currentTrack.listBlockAdditionMapping == null){
+          currentTrack.listBlockAdditionMapping = new ArrayList<>();
         }
-        currentTrack.listAdditionMapping.add(currentAdditionMapping);
-        currentAdditionMapping = null;
+        currentTrack.listBlockAdditionMapping.add(currentBlockAdditionMapping);
+        currentBlockAdditionMapping = null;
         Log.i("yusesope","ID_BLOCK_ADDITIONAL_MAPPING is closed");
         break;
       case ID_TRACK_ENTRY:
@@ -993,12 +993,10 @@ public class MatroskaExtractor implements Extractor {
         blockAdditionalId = (int) value;
         break;
       case ID_BLOCK_ADD_ID_VALUE:
-        currentAdditionMapping.idValue = (int) value;
-        Log.i("yusesope",String.format("ID_BLOCK_ADD_ID_VALUE = %d", currentAdditionMapping.idValue));
+        currentBlockAdditionMapping.idValue = (int) value;
         break;
       case ID_BLOCK_ADD_ID_TYPE:
-        currentAdditionMapping.idType = (int) value;
-        Log.i("yusesope",String.format("ID_BLOCK_ADD_ID_TYPE = %d", currentAdditionMapping.idType));
+        currentBlockAdditionMapping.idType = (int) value;
         break;
       default:
         break;
@@ -1270,8 +1268,8 @@ public class MatroskaExtractor implements Extractor {
             tracks.get(blockTrackNumber), blockAdditionalId, input, contentSize);
         break;
       case ID_BLOCK_ADD_ID_EXTRA_DATA:
-        currentAdditionMapping.extraData = new byte[contentSize];
-        input.readFully(currentAdditionMapping.extraData, 0, contentSize);
+        currentBlockAdditionMapping.extraData = new byte[contentSize];
+        input.readFully(currentBlockAdditionMapping.extraData, 0, contentSize);
       default:
         throw new ParserException("Unexpected id: " + id);
     }
@@ -1893,7 +1891,7 @@ public class MatroskaExtractor implements Extractor {
     }
   }
 
-  private static final class AdditionMapping {
+  private static final class BlockAdditionMapping {
     private static final int TYPE_mvcC = 1;
     private static final int TYPE_hvcE = 2;
     private static final int TYPE_dvcC = 3;
@@ -1929,7 +1927,7 @@ public class MatroskaExtractor implements Extractor {
     public TrackOutput.CryptoData cryptoData;
     public byte[] codecPrivate;
     public DrmInitData drmInitData;
-    public ArrayList<AdditionMapping> listAdditionMapping;
+    public ArrayList<BlockAdditionMapping> listBlockAdditionMapping;
 
     // Video elements.
     public int width = Format.NO_VALUE;
@@ -2013,10 +2011,11 @@ public class MatroskaExtractor implements Extractor {
           AvcConfig avcConfig = AvcConfig.parse(new ParsableByteArray(codecPrivate));
           initializationData = avcConfig.initializationData;
           nalUnitLengthFieldLength = avcConfig.nalUnitLengthFieldLength;
-          if (listAdditionMapping != null) {
-            for (AdditionMapping addMappAvc : listAdditionMapping) {
-              switch (addMappAvc.idType) {
-                case AdditionMapping.TYPE_mvcC:
+          if (listBlockAdditionMapping != null) {
+            for (BlockAdditionMapping blockAdditionMapping : listBlockAdditionMapping) {
+              switch (blockAdditionMapping.idType) {
+                case BlockAdditionMapping.TYPE_mvcC:
+                  //Placeholder for MVC integration
                   break;
                 default:
                   break;
@@ -2029,22 +2028,23 @@ public class MatroskaExtractor implements Extractor {
           HevcConfig hevcConfig = HevcConfig.parse(new ParsableByteArray(codecPrivate));
           initializationData = hevcConfig.initializationData;
           nalUnitLengthFieldLength = hevcConfig.nalUnitLengthFieldLength;
-          if (listAdditionMapping != null){
-            for (AdditionMapping addMappHevc : listAdditionMapping) {
-              switch (addMappHevc.idType) {
-                case AdditionMapping.TYPE_dvcC:
+          if (listBlockAdditionMapping != null){
+            for (BlockAdditionMapping blockAdditionMapping : listBlockAdditionMapping) {
+              switch (blockAdditionMapping.idType) {
+                case BlockAdditionMapping.TYPE_dvcC:
                   DolbyVisionConfig dolbyVisionConfig = DolbyVisionConfig.parse(
-                      new ParsableByteArray(addMappHevc.extraData)
+                      new ParsableByteArray(blockAdditionMapping.extraData)
                   );
                   if (dolbyVisionConfig != null) {
                     codecs = dolbyVisionConfig.codecs;
                     mimeType = MimeTypes.VIDEO_DOLBY_VISION;
                   }
                   break;
-                case AdditionMapping.TYPE_hvcE:
+                case BlockAdditionMapping.TYPE_hvcE:
                   HevcConfig enhancementLayerHevcConfig = HevcConfig.parse(
-                      new ParsableByteArray(addMappHevc.extraData)
+                      new ParsableByteArray(blockAdditionMapping.extraData)
                   );
+                  //TODO add implementation for EL
                   break;
                 default:
                   break;
