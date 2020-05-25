@@ -2022,7 +2022,6 @@ public class MatroskaExtractor implements Extractor {
           HevcConfig hevcConfig = HevcConfig.parse(new ParsableByteArray(codecPrivate));
           initializationData = hevcConfig.initializationData;
           nalUnitLengthFieldLength = hevcConfig.nalUnitLengthFieldLength;
-          nalUnitLengthFieldLength = hevcConfig.nalUnitLengthFieldLength;
           if (listAdditionMapping != null){
             for (AdditionMapping addMappHevc : listAdditionMapping) {
               switch (addMappHevc.idType) {
