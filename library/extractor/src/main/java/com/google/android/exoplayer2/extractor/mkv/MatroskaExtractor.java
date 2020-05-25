@@ -365,6 +365,9 @@ public class MatroskaExtractor implements Extractor {
 
   // The track corresponding to the current TrackEntry element, or null.
   @Nullable private Track currentTrack;
+  
+  // The current AdditionMapping element, or null.
+  private AdditionMapping currentAdditionMapping;
 
   // The current AdditionMapping element, or null.
   private AdditionMapping currentAdditionMapping;
@@ -1891,6 +1894,16 @@ public class MatroskaExtractor implements Extractor {
         chunkSampleCount = 0;
       }
     }
+  }
+  
+  private static final class AdditionMapping {
+    private static final int TYPE_mvcC = 1;
+    private static final int TYPE_hvcE = 2;
+    private static final int TYPE_dvcC = 3;
+
+    public int idValue;
+    public int idType;
+    public byte[]  extraData;
   }
 
   private static final class AdditionMapping {
