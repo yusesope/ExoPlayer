@@ -1270,7 +1270,7 @@ public class MatroskaExtractor implements Extractor {
             tracks.get(blockTrackNumber), blockAdditionalId, input, contentSize);
         break;
       case ID_BLOCK_ADD_ID_EXTRA_DATA:
-        currentAdditionMapping.extraData = new byte[contentSize]
+        currentAdditionMapping.extraData = new byte[contentSize];
         input.readFully(currentAdditionMapping.extraData, 0, contentSize);
       default:
         throw new ParserException("Unexpected id: " + id);
