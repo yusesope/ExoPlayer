@@ -225,6 +225,11 @@ public class MatroskaExtractor implements Extractor {
   private static final int ID_LUMNINANCE_MAX = 0x55D9;
   private static final int ID_LUMNINANCE_MIN = 0x55DA;
 
+  private static final int ID_BLOCK_ADDITION_MAPPING = 0x41E4;
+  private static final int ID_BLOCK_ADD_ID_VALUE = 0x41F0;
+  private static final int ID_BLOCK_ADD_ID_TYPE = 0x41E7;
+  private static final int ID_BLOCK_ADD_ID_EXTRA_DATA = 0x41ED;
+
   /**
    * BlockAddID value for ITU T.35 metadata in a VP9 track. See also
    * https://www.webmproject.org/docs/container/.
@@ -253,8 +258,8 @@ public class MatroskaExtractor implements Extractor {
    */
   private static final byte[] SUBRIP_PREFIX =
       new byte[] {
-        49, 10, 48, 48, 58, 48, 48, 58, 48, 48, 44, 48, 48, 48, 32, 45, 45, 62, 32, 48, 48, 58, 48,
-        48, 58, 48, 48, 44, 48, 48, 48, 10
+          49, 10, 48, 48, 58, 48, 48, 58, 48, 48, 44, 48, 48, 48, 32, 45, 45, 62, 32, 48, 48, 58, 48,
+          48, 58, 48, 48, 44, 48, 48, 48, 10
       };
   /**
    * The byte offset of the end timecode in {@link #SUBRIP_PREFIX}.
@@ -288,8 +293,8 @@ public class MatroskaExtractor implements Extractor {
    */
   private static final byte[] SSA_PREFIX =
       new byte[] {
-        68, 105, 97, 108, 111, 103, 117, 101, 58, 32, 48, 58, 48, 48, 58, 48, 48, 58, 48, 48, 44,
-        48, 58, 48, 48, 58, 48, 48, 58, 48, 48, 44
+          68, 105, 97, 108, 111, 103, 117, 101, 58, 32, 48, 58, 48, 48, 58, 48, 48, 58, 48, 48, 44,
+          48, 58, 48, 48, 58, 48, 48, 58, 48, 48, 44
       };
   /**
    * The byte offset of the end timecode in {@link #SSA_PREFIX}.
@@ -360,6 +365,9 @@ public class MatroskaExtractor implements Extractor {
 
   // The track corresponding to the current TrackEntry element, or null.
   @Nullable private Track currentTrack;
+
+  // The current AdditionMapping element, or null.
+  private AdditionMapping currentAdditionMapping;
 
   // Whether a seek map has been sent to the output.
   private boolean sentSeekMap;
@@ -513,6 +521,8 @@ public class MatroskaExtractor implements Extractor {
       case ID_BLOCK_MORE:
       case ID_PROJECTION:
       case ID_COLOUR:
+      case ID_BLOCK_ADDITION_MAPPING:
+        return EbmlProcessor.ELEMENT_TYPE_MASTER;
       case ID_MASTERING_METADATA:
         return EbmlProcessor.ELEMENT_TYPE_MASTER;
       case ID_EBML_READ_VERSION:
@@ -655,6 +665,10 @@ public class MatroskaExtractor implements Extractor {
       case ID_MASTERING_METADATA:
         currentTrack.hasColorInfo = true;
         break;
+      case ID_BLOCK_ADDITION_MAPPING:
+        currentAdditionMapping = new AdditionMapping();
+        Log.i("yusesope","ID_BLOCK_ADDITIONAL_MAPPING is open");
+        break;
       default:
         break;
     }
@@ -731,6 +745,14 @@ public class MatroskaExtractor implements Extractor {
         if (currentTrack.hasContentEncryption && currentTrack.sampleStrippedBytes != null) {
           throw new ParserException("Combining encryption and compression is not supported");
         }
+        break;
+      case ID_BLOCK_ADDITION_MAPPING:
+        if (currentTrack.listAdditionMapping == null){
+          currentTrack.listAdditionMapping = new ArrayList<>();
+        }
+        currentTrack.listAdditionMapping.add(currentAdditionMapping);
+        currentAdditionMapping = null;
+        Log.i("yusesope","ID_BLOCK_ADDITIONAL_MAPPING is closed");
         break;
       case ID_TRACK_ENTRY:
         if (isCodecSupported(currentTrack.codecId)) {
@@ -967,6 +989,14 @@ public class MatroskaExtractor implements Extractor {
         break;
       case ID_BLOCK_ADD_ID:
         blockAdditionalId = (int) value;
+        break;
+      case ID_BLOCK_ADD_ID_VALUE:
+        currentAdditionMapping.idValue = (int) value;
+        Log.i("yusesope",String.format("ID_BLOCK_ADD_ID_VALUE = %d", currentAdditionMapping.idValue));
+        break;
+      case ID_BLOCK_ADD_ID_TYPE:
+        currentAdditionMapping.idType = (int) value;
+        Log.i("yusesope",String.format("ID_BLOCK_ADD_ID_TYPE = %d", currentAdditionMapping.idType));
         break;
       default:
         break;
@@ -1236,6 +1266,11 @@ public class MatroskaExtractor implements Extractor {
         }
         handleBlockAdditionalData(
             tracks.get(blockTrackNumber), blockAdditionalId, input, contentSize);
+        break;
+      case ID_BLOCK_ADD_ID_EXTRA_DATA:
+        currentAdditionMapping.extraData = new byte[contentSize];
+        input.readFully(currentAdditionMapping.extraData, 0, contentSize);
+        Log.i("yusesope",String.format("ID_BLOCK_ADD_ID_EXTRA_DATA size = %d", currentAdditionMapping.extraData.length));
         break;
       default:
         throw new ParserException("Unexpected id: " + id);
@@ -1858,6 +1893,16 @@ public class MatroskaExtractor implements Extractor {
     }
   }
 
+  private static final class AdditionMapping {
+    private static final int TYPE_mvcC = 1;
+    private static final int TYPE_hvcE = 2;
+    private static final int TYPE_dvcC = 3;
+
+    public int idValue;
+    public int idType;
+    public byte[]  extraData;
+  }
+
   private static final class Track {
 
     private static final int DISPLAY_UNIT_PIXELS = 0;
@@ -1884,6 +1929,7 @@ public class MatroskaExtractor implements Extractor {
     public TrackOutput.CryptoData cryptoData;
     public byte[] codecPrivate;
     public DrmInitData drmInitData;
+    public ArrayList<AdditionMapping> listAdditionMapping;
 
     // Video elements.
     public int width = Format.NO_VALUE;
@@ -1967,12 +2013,44 @@ public class MatroskaExtractor implements Extractor {
           AvcConfig avcConfig = AvcConfig.parse(new ParsableByteArray(codecPrivate));
           initializationData = avcConfig.initializationData;
           nalUnitLengthFieldLength = avcConfig.nalUnitLengthFieldLength;
+          if (listAdditionMapping != null) {
+            for (AdditionMapping addMappAvc : listAdditionMapping) {
+              switch (addMappAvc.idType) {
+                case AdditionMapping.TYPE_mvcC:
+                  break;
+                default:
+                  break;
+              }
+            }
+          }
           break;
         case CODEC_ID_H265:
           mimeType = MimeTypes.VIDEO_H265;
           HevcConfig hevcConfig = HevcConfig.parse(new ParsableByteArray(codecPrivate));
           initializationData = hevcConfig.initializationData;
           nalUnitLengthFieldLength = hevcConfig.nalUnitLengthFieldLength;
+          if (listAdditionMapping != null){
+            for (AdditionMapping addMappHevc : listAdditionMapping) {
+              switch (addMappHevc.idType) {
+                case AdditionMapping.TYPE_dvcC:
+                  DolbyVisionConfig dolbyVisionConfig = DolbyVisionConfig.parse(
+                      new ParsableByteArray(addMappHevc.extraData)
+                  );
+                  if (dolbyVisionConfig != null) {
+                    codecs = dolbyVisionConfig.codecs;
+                    mimeType = MimeTypes.VIDEO_DOLBY_VISION;
+                  }
+                  break;
+                case AdditionMapping.TYPE_hvcE:
+                  HevcConfig enhancementLayerHevcConfig = HevcConfig.parse(
+                      new ParsableByteArray(addMappHevc.extraData)
+                  );
+                  break;
+                default:
+                  break;
+              }
+            }
+          }
           break;
         case CODEC_ID_FOURCC:
           Pair<String, @NullableType List<byte[]>> pair =
