@@ -523,6 +523,7 @@ public class MatroskaExtractor implements Extractor {
       case ID_PROJECTION:
       case ID_COLOUR:
       case ID_MASTERING_METADATA:
+      case ID_BLOCK_ADDITION_MAPPING:
         return EbmlProcessor.ELEMENT_TYPE_MASTER;
       case ID_EBML_READ_VERSION:
       case ID_DOC_TYPE_READ_VERSION:
@@ -754,7 +755,6 @@ public class MatroskaExtractor implements Extractor {
         }
         currentTrack.listBlockAdditionMapping.add(currentBlockAdditionMapping);
         currentBlockAdditionMapping = null;
-        Log.i("yusesope","ID_BLOCK_ADDITIONAL_MAPPING is closed");
         break;
       case ID_TRACK_ENTRY:
         if (isCodecSupported(currentTrack.codecId)) {
@@ -1270,6 +1270,7 @@ public class MatroskaExtractor implements Extractor {
       case ID_BLOCK_ADD_ID_EXTRA_DATA:
         currentBlockAdditionMapping.extraData = new byte[contentSize];
         input.readFully(currentBlockAdditionMapping.extraData, 0, contentSize);
+        break;
       default:
         throw new ParserException("Unexpected id: " + id);
     }
@@ -1892,9 +1893,10 @@ public class MatroskaExtractor implements Extractor {
   }
 
   private static final class BlockAdditionMapping {
-    private static final int TYPE_mvcC = 1;
-    private static final int TYPE_hvcE = 2;
-    private static final int TYPE_dvcC = 3;
+    private static final int TYPE_mvcC = 0x6D766343;
+    private static final int TYPE_dvcC = 0x64766343;
+    private static final int TYPE_dvvC = 0x664767643;
+    private static final int TYPE_hvcE = 0x68766345;
 
     public int idValue;
     public int idType;
